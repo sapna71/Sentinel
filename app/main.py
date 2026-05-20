@@ -53,8 +53,8 @@ def create_app() -> FastAPI:
     # app.include_router(health_router, prefix="/health", tags=["health"])
     # app.include_router(metrics_router, prefix="/metrics", tags=["metrics"])
 
-    @app.get("/")
-    async def root():
+    @app.get("/")    # app.include_router(metrics_router, p
+    async def root():    # app.include_router(metrics_router, p
         return {
             "service": "SENTINEL",
             "status": "online",
