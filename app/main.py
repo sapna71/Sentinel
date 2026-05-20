@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.database.db import init_db
 
 # These imports will be filled in Phase 2+ as modules are built.
 # Placeholder structure to validate project layout now.
@@ -23,9 +24,8 @@ async def lifespan(app: FastAPI):
     - Warm up provider connections
     - Reset chaos state
     """
-    # Phase 2: db init goes here
-    # Phase 3: provider health checks go here
     print("🛡️  SENTINEL starting up...")
+    await init_db()
     yield
     print("🛡️  SENTINEL shutting down...")
 
