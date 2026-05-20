@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     yield
     print("🛡️  SENTINEL shutting down...")
 
-
+# Sentinel FastAPI entrypoint
 def create_app() -> FastAPI:
     app = FastAPI(
         title="SENTINEL",
