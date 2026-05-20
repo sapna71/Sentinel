@@ -36,7 +36,7 @@ def create_app() -> FastAPI:
         description="Self-healing AI orchestration platform with intelligent failover",
         version="0.1.0",
         lifespan=lifespan,
-    )
+    )# Sentinel FastAPI entrypoint
 
     # CORS — allow Next.js frontend in dev
     app.add_middleware(
