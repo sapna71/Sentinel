@@ -2,11 +2,6 @@
 
 SENTINEL is a resilience-focused AI agent framework designed for the TrueFoundry Hackathon. It implements a tiered fallback mechanism and tool-augmented generation to ensure continuity of service even when primary LLM providers fail.
 
-## 🚀 Current Status: Sprinting Phase (Day 2/10)
-The project is currently in the "Sprinting Phase," focusing on a perfectly working vertical slice.
-
-**Overall Progress: ~30% of total roadmap completed.**
-
 ### ✅ Implemented in Detail
 - **Tiered Fallback Engine**: 
     - Implemented a `StateGraph` in LangGraph that manages the transition between LLM providers.
