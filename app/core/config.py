@@ -13,10 +13,10 @@ class Settings(BaseSettings):
     OLLAMA_HOST: str = Field(default="http://localhost:11434")
 
     PRIMARY_MODEL : str = "gemma4:31b-cloud"
-    FALLBACK_MODEL : str = ""
+    FALLBACK_MODEL : str = "gpt-oss:120b-cloud"
     MAX_RETRIES : int = 3
     TIMEOUT : int = 30
 
-    modelConfig = SettingsConfigDict(env_file=".env", env_file_encoding = "utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding = "utf-8")
 
 settings = Settings()
