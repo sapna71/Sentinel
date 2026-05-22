@@ -132,7 +132,6 @@ The following infrastructure components are confirmed working:
 
 SENTINEL now automatically initializes:
 
-```text
 providers
 health_checks
 request_logs
@@ -170,7 +169,7 @@ app/
 ├── gateway/
 └── main.py
 ```
-#Environment Management
+Environment Management
 
 The project now uses:
 
