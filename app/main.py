@@ -2,8 +2,7 @@
 SENTINEL - Self-healing AI orchestration platform.
 
 Main FastAPI application entry point.
-Wires together routers, middleware, lifespan events,
-streaming infrastructure, and observability services.
+Wires together routers, middleware, lifespan events, main streaming infrastructure, and observability services.
 """
 
 from contextlib import asynccontextmanager
