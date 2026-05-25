@@ -27,6 +27,10 @@ class Settings(BaseSettings):
 
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
+    PRIMARY_MODEL: str = "gemma4:31b-cloud"
+    FALLBACK_MODEL: str = "gpt-oss:120b-cloud"
+    MAX_RETRIES: int = 3
+    TIMEOUT: int = 30
 
     ollama_base_url: str = "http://localhost:11434"
 

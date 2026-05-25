@@ -327,3 +327,31 @@ Observability event pipeline
 ✅ FastAPI lifecycle stabilized
 ✅ Provider persistence operational
 ✅ Infrastructure ready for streaming + resilience phase
+
+✅ Next.js frontend chat window scaffolded
+
+## Frontend Handover
+
+The frontend lives in [`frontend/`](frontend/).
+
+Run it with:
+
+```text
+cd frontend
+npm install
+npm run dev
+```
+
+Set the backend URL with:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+The chat window sends prompts to:
+
+```text
+POST /api/v1/chat/stream
+```
+
+It renders the live SSE stream, status events, fallback signals, and the final streamed answer.

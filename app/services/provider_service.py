@@ -19,8 +19,8 @@ class ProviderService:
     Currently focused on Ollama integration.
     """
     def __init__(self):
-        self.host = settings.OLLAMA_HOST
-        self.api_key = settings.OLLAMA_API_KEY
+        self.host = settings.host if hasattr(settings, 'OLLAMA_HOST') else "http://localhost:11434"
+        self.api_key = settings.openai_api_key if hasattr(settings, 'openai_api_key') else ""
 
     async def call_model(self, model_name: str, prompt: str) -> ProviderResponse:
         url = f"{self.host}/api/generate"

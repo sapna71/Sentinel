@@ -1,6 +1,6 @@
 import asyncio
 
-from schemas.streaming import StreamEvent
+from app.schemas.streaming import StreamEvent
 
 
 class EventBus:

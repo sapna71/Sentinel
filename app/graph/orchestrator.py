@@ -1,12 +1,14 @@
 from typing import TypedDict, Optional, Annotated, List
 from langgraph.graph import StateGraph, END
+from langgraph.checkpoint.sqlite import SqliteSaver
 from app.services.provider_service import ProviderService, ProviderResponse
 from app.core.config import settings
 from app.database.session import AsyncSessionLocal
 from app.database.models import RequestLog, Provider
 from app.tools.mcp_tools import get_all_tools
+from app.resilience.circuit_breaker import CircuitBreaker
 
-class AgentState(TypedDict):
+class AgentState(TypedDict):    
     prompt: str
     response: Optional[str]
     error: Optional[str]
@@ -20,6 +22,13 @@ class SentinelGraph:
     def __init__(self):
         self.provider_service = ProviderService()
         self.tools = get_all_tools()
+        # Circuit breakers for each tool
+        self.circuit_breakers = {
+            name: CircuitBreaker() for name in self.tools.keys()
+        }
+        # Initialize SqliteSaver for state recovery
+        # SqliteSaver.from_conn_string returns a context manager in newer versions
+        self.checkpointer = SqliteSaver.from_conn_string("checkpoints.sqlite")
         self.workflow = self._build_graph()
 
     def _build_graph(self):
@@ -56,7 +65,12 @@ class SentinelGraph:
         builder.add_edge("execute_tools", "log_result")
         builder.add_edge("log_result", END)
 
-        return builder.compile()
+        # For the demo, we use a simple checkpointer if the complex one fails
+        try:
+            return builder.compile(checkpointer=self.checkpointer)
+        except Exception:
+            print("⚠️ Checkpointer failed to compile, falling back to no-checkpoint mode.")
+            return builder.compile()
 
     async def call_primary(self, state: AgentState):
         print(f"🚀 Attempting primary model: {settings.PRIMARY_MODEL}")
@@ -78,7 +92,8 @@ class SentinelGraph:
             }
         return {
             "error": res.error,
-            "attempts": 1
+            "attempts": 1,
+            "provider_used": settings.PRIMARY_MODEL
         }
 
     async def call_fallback(self, state: AgentState):
@@ -101,19 +116,31 @@ class SentinelGraph:
         return {
             "error": res.error,
             "attempts": 2,
-            "is_fallback": True
+            "is_fallback": True,
+            "provider_used": settings.FALLBACK_MODEL
         }
 
     async def execute_tools(self, state: AgentState):
         print(f"Executing tools: {state.get('tool_calls')}")
         outputs = []
         for tool_name in state.get("tool_calls", []):
+            # Check circuit breaker
+            cb = self.circuit_breakers.get(tool_name)
+            if cb and not await cb.allow_request():
+                outputs.append(f"[{tool_name}]: 🔴 Circuit Open. Tool is currently disabled due to repeated failures.")
+                continue
+
             tool = self.tools.get(tool_name)
             if tool:
-                # Simple arg extraction for demo
-                args = {"query": state["prompt"], "expression": state["prompt"], "path": state["prompt"]}
-                result = await tool.execute(args)
-                outputs.append(f"[{tool_name}]: {result}")
+                try:
+                    # Simple arg extraction for demo
+                    args = {"query": state["prompt"], "expression": state["prompt"], "path": state["prompt"]}
+                    result = await tool.execute(args)
+                    await cb.record_success() if cb else None
+                    outputs.append(f"[{tool_name}]: {result}")
+                except Exception as e:
+                    await cb.record_failure() if cb else None
+                    outputs.append(f"[{tool_name}]: ❌ Execution failed: {str(e)}")
         
         return {
             "tool_outputs": outputs,

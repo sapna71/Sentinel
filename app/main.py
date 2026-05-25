@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database.db import init_db
 
 # Future router imports
-# from app.api.routers.chat import router as chat_router
+from app.api.routers.chat import router as chat_router
 # from app.api.routers.health import router as health_router
 # from app.api.routers.chaos import router as chaos_router
 # from app.api.routers.metrics import router as metrics_router
@@ -98,6 +98,7 @@ def create_app() -> FastAPI:
     )
 
     # Router registration
+    app.include_router(chat_router, prefix="/api/v1/chat", tags=["chat"])
     #
     # Uncomment as modules are implemented.
     #

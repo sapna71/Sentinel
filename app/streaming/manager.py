@@ -1,8 +1,8 @@
 from uuid import uuid4
 from datetime import datetime
 
-from streaming.event_bus import EventBus
-from schemas.streaming import (
+from app.streaming.event_bus import EventBus
+from app.schemas.streaming import (
     StreamEvent,
     StreamEventType,
 )

@@ -2,6 +2,7 @@ from typing import Dict, Any
 import os
 import subprocess
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +65,15 @@ class CalculatorTool(MCPTool):
             return "Error: No expression provided."
         
         try:
-            # Using a safe eval or simple math for the demo
-            # In production, use a proper math library
+            # Extract only the mathematical part of the prompt for the demo
+            # This handles cases where the prompt is "Calculate 123 * 456"
+            match = re.search(r"([0-9\s\+\-\*\/\(\)\.]+)", expression)
+            if match:
+                clean_expr = match.group(1).strip()
+                result = eval(clean_expr, {"__builtins__": None}, {})
+                return f"Result: {result}"
+            
+            # Fallback to raw eval if regex fails but it might be a simple expression
             result = eval(expression, {"__builtins__": None}, {})
             return f"Result: {result}"
         except Exception as e:
