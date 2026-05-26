@@ -19,6 +19,12 @@ type Signal = {
   detail: string;
 };
 
+type ChaosStatus = {
+  kill_claude: boolean;
+  latency_spike: boolean;
+  mcp_crash: boolean;
+};
+
 type StreamEnvelope = {
   event: string;
   data: {
@@ -102,7 +108,11 @@ async function animateMessage(
   updateMessage(text);
 }
 
-export function SentinelChat() {
+interface SentinelChatProps {
+  chaosStatus?: ChaosStatus;
+}
+
+export function SentinelChat({ chaosStatus }: SentinelChatProps) {
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -144,6 +154,10 @@ export function SentinelChat() {
   const assistantMessageIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const chaosActive = chaosStatus
+    ? Object.values(chaosStatus).some(Boolean)
+    : false;
+
   const metrics = useMemo(
     () => [
       {
@@ -162,12 +176,19 @@ export function SentinelChat() {
         note: 'Shows whether the primary or fallback route is active.',
       },
       {
+        label: 'Chaos toggles',
+        value: chaosStatus
+          ? `${Object.values(chaosStatus).filter(Boolean).length}/3 active`
+          : '--',
+        note: 'Active simulation flags from the chaos dashboard.',
+      },
+      {
         label: 'Endpoint',
         value: 'SSE',
         note: 'POST /api/v1/chat/stream returns live events.',
       },
     ],
-    [fallbackState, lastLatency, signals.length],
+    [fallbackState, lastLatency, signals.length, chaosStatus],
   );
 
   useEffect(() => {
@@ -388,8 +409,8 @@ export function SentinelChat() {
 
         <div className="hero-status">
           <div className="status-pill">
-            <span className="status-dot" />
-            <strong>{liveStatus}</strong>
+            <span className={`status-dot ${chaosActive ? 'signal-dot--warning' : 'signal-dot--success'}`} />
+            <strong>{chaosActive ? 'Chaos simulation enabled' : liveStatus}</strong>
           </div>
           <div className="status-pill">
             <small>Active model lane</small>

@@ -19,8 +19,12 @@ class Settings(BaseSettings):
     PRIMARY_MODEL: str = "gpt-4o-mini"
 
     SECONDARY_MODEL: str = (
-        "meta-llama/llama-3.1-8b-instruct"
+        "gpt-4o-mini"
     )
+
+    FALLBACK_MODEL: str = "gpt-4o-mini"
+
+    EMERGENCY_MODEL: str = "meta-llama/llama-3.1-8b-instruct"
 
     MAX_RETRIES: int = 2
 

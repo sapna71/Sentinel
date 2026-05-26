@@ -1,8 +1,10 @@
+import asyncio
 import httpx
 import time
 import logging
 from typing import Optional
 from app.core.config import settings
+from app.core.chaos import chaos_state
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,20 @@ class ProviderService:
 
         start_time = time.perf_counter()
         try:
-            async with httpx.AsyncClient(timeout=settings.TIMEOUT) as client:
+            if chaos_state.latency_spike:
+                await asyncio.sleep(10)
+
+            if chaos_state.kill_claude and model_name == settings.PRIMARY_MODEL:
+                latency = (time.perf_counter() - start_time) * 1000
+                error_msg = "Simulated outage: Claude model is currently disabled."
+                logger.warning(error_msg)
+                return ProviderResponse(
+                    success=False,
+                    error=error_msg,
+                    latency=latency,
+                )
+
+            async with httpx.AsyncClient(timeout=settings.REQUEST_TIMEOUT) as client:
                 response = await client.post(url, json=payload, headers=headers)
                 response.raise_for_status()
                 

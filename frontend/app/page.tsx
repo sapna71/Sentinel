@@ -1,5 +1,5 @@
-import { SentinelChat } from '@/components/sentinel-chat';
+import { ChaosDashboard } from '@/components/chaos-dashboard';
 
 export default function Page() {
-  return <SentinelChat />;
+  return <ChaosDashboard />;
 }
