@@ -15,7 +15,7 @@ const mono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: 'SENTINEL',
-  description: 'Resilient AI orchestration demo for the hackathon stage.',
+  description: 'Resilient AI orchestration console for incident response and automation.',
 };
 
 export default function RootLayout({

@@ -1,22 +1,16 @@
 'use client';
-
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 
 type ChatRole = 'user' | 'assistant' | 'system';
-type SignalTone = 'info' | 'success' | 'warning' | 'error';
-
 type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
   meta?: string;
-};
-
-type Signal = {
-  id: string;
-  tone: SignalTone;
-  title: string;
-  detail: string;
 };
 
 type StreamEnvelope = {
@@ -31,29 +25,6 @@ type StreamEnvelope = {
     };
   };
 };
-
-const DEMO_PROMPTS = [
-  {
-    title: 'Resilience check',
-    subtitle: 'Show fallback behavior under stress.',
-    prompt: 'Explain what happens when the primary model is down.',
-  },
-  {
-    title: 'Tool demo',
-    subtitle: 'Trigger tool usage and summarize the output.',
-    prompt: 'Search the workspace status and summarize the latest progress.',
-  },
-  {
-    title: 'Hackathon pitch',
-    subtitle: 'Turn the system into a crisp demo story.',
-    prompt: 'Give me a 30 second demo pitch for Sentinel.',
-  },
-  {
-    title: 'Recovery story',
-    subtitle: 'Make the checkpointing value obvious.',
-    prompt: 'Explain why checkpointing matters if the app crashes mid-task.',
-  },
-] as const;
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
 const STREAM_ENDPOINT = `${API_BASE}/api/v1/chat/stream`;
@@ -108,84 +79,29 @@ export function SentinelChat() {
     {
       id: uid(),
       role: 'assistant',
-      content:
-        'SENTINEL is online. Send a request and I will stream the result, show fallback events, and keep the demo moving even if the primary lane fails.',
-      meta: 'Ready for live streaming',
-    },
-  ]);
-  const [signals, setSignals] = useState<Signal[]>([
-    {
-      id: uid(),
-      tone: 'success',
-      title: 'Backend connection',
-      detail: STREAM_ENDPOINT,
-    },
-    {
-      id: uid(),
-      tone: 'info',
-      title: 'Resilience lane',
-      detail: 'Primary model → fallback model → checkpointed recovery',
-    },
-    {
-      id: uid(),
-      tone: 'info',
-      title: 'Tooling',
-      detail: 'Search, file reader, calculator, and graph orchestration ready',
+      content: 'SENTINEL is online. Submit an instruction and the agent will stream progress, fallback events, and final results.',
+      meta: 'Ready',
     },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [liveStatus, setLiveStatus] = useState('Idle and ready');
   const [activeProvider, setActiveProvider] = useState('Primary lane');
   const [lastLatency, setLastLatency] = useState<number | null>(null);
-  const [fallbackState, setFallbackState] = useState('Standby');
-  const [draftPreview, setDraftPreview] = useState('');
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const assistantMessageIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const metrics = useMemo(
-    () => [
-      {
-        label: 'Latency',
-        value: lastLatency == null ? '--' : `${lastLatency}ms`,
-        note: 'Measured from submit to stream completion.',
-      },
-      {
-        label: 'Signals',
-        value: `${signals.length}`,
-        note: 'Live status events pushed from the backend.',
-      },
-      {
-        label: 'Lane',
-        value: fallbackState,
-        note: 'Shows whether the primary or fallback route is active.',
-      },
-      {
-        label: 'Endpoint',
-        value: 'SSE',
-        note: 'POST /api/v1/chat/stream returns live events.',
-      },
-    ],
-    [fallbackState, lastLatency, signals.length],
-  );
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, signals, isStreaming]);
+  }, [messages, isStreaming]);
+
 
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
     };
   }, []);
-
-  function pushSignal(tone: SignalTone, title: string, detail: string) {
-    setSignals((current) => [
-      { id: uid(), tone, title, detail },
-      ...current,
-    ].slice(0, 6));
-  }
 
   function updateAssistantMessage(content: string) {
     const assistantId = assistantMessageIdRef.current;
@@ -233,10 +149,8 @@ export function SentinelChat() {
 
     setMessages((current) => [...current, userMessage, assistantMessage]);
     setPrompt('');
-    setDraftPreview('');
     setIsStreaming(true);
     setLiveStatus('Connecting to backend stream...');
-    setFallbackState('Primary lane');
 
     const startedAt = performance.now();
 
@@ -284,27 +198,12 @@ export function SentinelChat() {
           if (envelope.event === 'status') {
             const message = envelope.data.payload?.message ?? 'Status update received.';
             setLiveStatus(message);
-            pushSignal('info', 'System status', message);
 
-            if (message.toLowerCase().includes('fallback') || message.toLowerCase().includes('unstable')) {
-              setFallbackState('Fallback lane');
-            }
-
-            setMessages((current) => [
-              ...current,
-              {
-                id: uid(),
-                role: 'system',
-                content: message,
-                meta: 'Stream event',
-              },
-            ]);
           }
 
           if (envelope.event === 'token') {
             const responseText = envelope.data.payload?.token ?? 'No content returned.';
             await animateMessage(updateAssistantMessage, responseText);
-            setDraftPreview(responseText);
           }
 
           if (envelope.event === 'completion') {
@@ -314,8 +213,6 @@ export function SentinelChat() {
             setLastLatency(elapsed);
             setActiveProvider(provider);
             setLiveStatus(`Completed in ${elapsed}ms`);
-            setFallbackState(provider.toLowerCase().includes('fallback') ? 'Fallback lane' : 'Primary lane');
-            pushSignal('success', 'Completion', `Response finished via ${provider}`);
 
             setMessages((current) =>
               current.map((message) =>
@@ -332,8 +229,6 @@ export function SentinelChat() {
           if (envelope.event === 'error') {
             const message = envelope.data.payload?.message ?? 'Stream failed.';
             setLiveStatus('Encountered an error');
-            setFallbackState('Error lane');
-            pushSignal('error', 'Stream error', message);
 
             setMessages((current) => [
               ...current,
@@ -350,8 +245,6 @@ export function SentinelChat() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown request failure';
       setLiveStatus('Request failed');
-      setFallbackState('Error lane');
-      pushSignal('error', 'Frontend request failed', message);
 
       setMessages((current) => [
         ...current,
@@ -377,12 +270,11 @@ export function SentinelChat() {
     <main className="app-shell">
       <section className="hero">
         <div className="hero-copy">
-          <span className="eyebrow">TrueFoundry Hackathon Demo</span>
+          <span className="eyebrow">Operational Console</span>
           <h1 className="hero-title">SENTINEL</h1>
           <p className="hero-subtitle">
-            A resilient AI orchestration cockpit with fallback routing, tool execution,
-            and live streaming responses. Built to prove the demo, not to overbuild the
-            stack.
+            A resilient AI orchestration console with fallback routing, tool execution,
+            and live streaming responses for incident response and automation.
           </p>
         </div>
 
@@ -398,17 +290,13 @@ export function SentinelChat() {
         </div>
       </section>
 
-      <section className="layout-grid">
+      <section className="layout-grid chat-central">
         <div className="panel chat-layout">
           <div className="panel-header">
             <div>
-              <h2 className="panel-title">Live command stream</h2>
-              <p className="panel-subtitle">
-                Send a prompt, watch the stream, and see failover state in real time.
-              </p>
+              <h2 className="panel-title">Agent Workspace</h2>
+              <p className="panel-subtitle">Interact with Sentinel and observe live progress.</p>
             </div>
-
-            <span className="pill">POST /api/v1/chat/stream</span>
           </div>
 
           <div className="message-list">
@@ -437,7 +325,10 @@ export function SentinelChat() {
                     .filter(Boolean)
                     .join(' ')}
                 >
-                  {message.content}
+                 <ReactMarkdown
+                 remarkPlugins={[remarkMath,remarkGfm]}
+                 rehypePlugins={[rehypeKatex]}
+                 >{message.content}</ReactMarkdown>
                 </div>
               </article>
             ))}
@@ -466,16 +357,14 @@ export function SentinelChat() {
                 value={prompt}
                 onChange={(event) => {
                   setPrompt(event.target.value);
-                  setDraftPreview(event.target.value);
                 }}
-                placeholder="Ask Sentinel to summarize a roadmap, trigger fallback logic, inspect a file, or explain the recovery flow..."
+                placeholder="Describe the incident or task (e.g., 'Coordinate response for a water main break on 5th Ave')"
                 rows={5}
               />
 
               <div className="composer-row">
                 <p className="composer-note">
-                  Use the send button or a quick prompt. The UI consumes the SSE stream
-                  and renders status, token, and completion events.
+                  Send an instruction and review the live response as Sentinel processes it.
                 </p>
 
                 <div className="button-row">
@@ -500,80 +389,6 @@ export function SentinelChat() {
             </form>
           </div>
         </div>
-
-        <aside className="panel panel--solid">
-          <div className="panel-header">
-            <div>
-              <h2 className="panel-title">Operator rail</h2>
-              <p className="panel-subtitle">
-                Demo cues, health signals, and quick actions for the hackathon stage.
-              </p>
-            </div>
-
-            <span className="pill">Sentinel control room</span>
-          </div>
-
-          <div className="dash">
-            <div className="metrics">
-              {metrics.map((metric) => (
-                <article key={metric.label} className="metric-card">
-                  <span className="metric-value">{metric.value}</span>
-                  <div className="metric-label">{metric.label}</div>
-                  <div className="metric-label">{metric.note}</div>
-                </article>
-              ))}
-            </div>
-
-            <section>
-              <div className="section-heading">Quick prompts</div>
-              <div className="quick-grid">
-                {DEMO_PROMPTS.map((item) => (
-                  <button
-                    key={item.title}
-                    type="button"
-                    className="quick-button"
-                    onClick={async () => {
-                      setPrompt(item.prompt);
-                      setDraftPreview(item.prompt);
-                      await submitPrompt(item.prompt);
-                    }}
-                    disabled={isStreaming}
-                  >
-                    <span className="quick-title">{item.title}</span>
-                    <span className="quick-subtitle">{item.subtitle}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <div className="section-heading">Live signals</div>
-              <div className="signal-list">
-                {signals.map((signal) => (
-                  <article key={signal.id} className="signal-item">
-                    <span className={`signal-dot signal-dot--${signal.tone}`} />
-                    <div>
-                      <div className="signal-title">{signal.title}</div>
-                      <div className="signal-detail">{signal.detail}</div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="signal-item">
-              <span className="signal-dot signal-dot--info" />
-              <div>
-                <div className="signal-title">Demo readiness</div>
-                <div className="signal-detail">
-                  {draftPreview
-                    ? `Draft loaded: ${draftPreview.slice(0, 96)}${draftPreview.length > 96 ? '…' : ''}`
-                    : 'Prompt preview appears here before sending. The stream is designed to make the failover story obvious on stage.'}
-                </div>
-              </div>
-            </section>
-          </div>
-        </aside>
       </section>
     </main>
   );
