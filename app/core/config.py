@@ -1,71 +1,43 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 
 
 class Settings(BaseSettings):
 
-    # ==========================================
-    # Application
-    # ==========================================
+    APP_NAME: str = "SENTINEL"
 
-    app_name: str = "SENTINEL"
-    debug: bool = True
-    log_level: str = "INFO"
+    DEBUG: bool = True
+    LOG_LEVEL: str = "INFO"
 
-    host: str = "0.0.0.0"
-    port: int = 8000
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
 
-    # ==========================================
-    # Database
-    # ==========================================
+    DATABASE_URL: str = "sqlite+aiosqlite:///./sentinel.db"
 
-    database_url: str = "sqlite+aiosqlite:///./sentinel.db"
+    OPENAI_API_KEY: str
+    OPENROUTER_API_KEY: str
 
-    # ==========================================
-    # Providers
-    # ==========================================
+    PRIMARY_MODEL: str = "gpt-4o-mini"
 
-    openai_api_key: str | None = None
-    anthropic_api_key: str | None = None
-    PRIMARY_MODEL: str = "gemma4:31b-cloud"
-    FALLBACK_MODEL: str = "gpt-oss:120b-cloud"
-    MAX_RETRIES: int = 3
-    TIMEOUT: int = 30
-
-    ollama_base_url: str = "http://localhost:11434"
-
-    primary_model: str = "gpt-4o-mini"
-    secondary_model: str = "gpt-4o-mini"
-    tertiary_model: str = "llama3.1"
-
-    # ==========================================
-    # Retry / Failover
-    # ==========================================
-
-    retry_base_delay: float = 1.0
-    retry_max_delay: float = 10.0
-
-    request_timeout: float = 30.0
-
-    # ==========================================
-    # Circuit Breaker
-    # ==========================================
-
-    circuit_breaker_threshold: int = 3
-    circuit_breaker_reset_timeout: int = 60
-
-    # ==========================================
-    # CORS
-    # ==========================================
-
-    cors_origins: str = (
-        "http://localhost:3000,"
-        "http://127.0.0.1:3000"
+    SECONDARY_MODEL: str = (
+        "gpt-4o-mini"
     )
 
-    # ==========================================
-    # Pydantic Settings Config
-    # ==========================================
+    FALLBACK_MODEL: str = "gpt-4o-mini"
+
+    EMERGENCY_MODEL: str = "meta-llama/llama-3.1-8b-instruct"
+
+    MAX_RETRIES: int = 2
+
+    REQUEST_TIMEOUT: int = 30
+
+    CIRCUIT_BREAKER_THRESHOLD: int = 3
+
+    CIRCUIT_BREAKER_RESET_TIMEOUT: int = 60
+
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
     model_config = SettingsConfigDict(
         env_file=".env",

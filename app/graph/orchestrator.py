@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from app.services.provider_service import ProviderService, ProviderResponse
 from app.core.config import settings
+from app.core.chaos import chaos_state
 from app.database.session import AsyncSessionLocal
 from app.database.models import RequestLog, Provider
 from app.tools.mcp_tools import get_all_tools
@@ -37,6 +38,7 @@ class SentinelGraph:
         # Define Nodes
         builder.add_node("call_primary", self.call_primary)
         builder.add_node("call_fallback", self.call_fallback)
+        builder.add_node("call_emergency", self.call_emergency)
         builder.add_node("execute_tools", self.execute_tools)
         builder.add_node("log_result", self.log_result)
 
@@ -55,6 +57,15 @@ class SentinelGraph:
         
         builder.add_conditional_edges(
             "call_fallback",
+            self.should_emergency,
+            {
+                "emergency": "call_emergency",
+                "success": "execute_tools"
+            }
+        )
+
+        builder.add_conditional_edges(
+            "call_emergency",
             self.check_for_tools_logic,
             {
                 "tools": "execute_tools",
@@ -120,6 +131,31 @@ class SentinelGraph:
             "provider_used": settings.FALLBACK_MODEL
         }
 
+    async def call_emergency(self, state: AgentState):
+        print(f"🚨 Secondary failover reached. Attempting emergency model: {settings.EMERGENCY_MODEL}")
+        res = await self.provider_service.call_model(settings.EMERGENCY_MODEL, state["prompt"])
+
+        if res.success:
+            return {
+                "response": res.content,
+                "provider_used": settings.EMERGENCY_MODEL,
+                "attempts": 3,
+                "is_fallback": True,
+                "tool_calls": state.get("tool_calls", []),
+            }
+
+        return {
+            "error": res.error,
+            "attempts": 3,
+            "is_fallback": True,
+            "provider_used": settings.EMERGENCY_MODEL,
+        }
+
+    def should_emergency(self, state: AgentState):
+        if state.get("error") and not state.get("response"):
+            return "emergency"
+        return "success"
+
     async def execute_tools(self, state: AgentState):
         print(f"Executing tools: {state.get('tool_calls')}")
         outputs = []
@@ -128,6 +164,11 @@ class SentinelGraph:
             cb = self.circuit_breakers.get(tool_name)
             if cb and not await cb.allow_request():
                 outputs.append(f"[{tool_name}]: 🔴 Circuit Open. Tool is currently disabled due to repeated failures.")
+                continue
+
+            if chaos_state.mcp_crash:
+                await cb.record_failure() if cb else None
+                outputs.append(f"[{tool_name}]: ❌ Simulated MCP outage. The tool cannot execute.")
                 continue
 
             tool = self.tools.get(tool_name)
@@ -173,7 +214,6 @@ class SentinelGraph:
     def check_for_tools_logic(self, state: AgentState):
         if state.get("tool_calls") and len(state["tool_calls"]) > 0:
             return "tools"
-        return "success"
         return "success"
 
     async def run(self, prompt: str):
