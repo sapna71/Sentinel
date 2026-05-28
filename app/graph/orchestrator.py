@@ -76,13 +76,12 @@ class SentinelGraph:
 
     async def call_primary(self, state: AgentState):
         if state.get("force_fallback"):
-          print("⛔ Kill switch active. Skipping primary model.")
-        return {
-            "error": "Kill switch active",
-            "attempts": 1,
-            "provider_used": settings.PRIMARY_MODEL,
-            "force_fallback": True,
-        }
+            print("⛔ Kill switch active. Skipping primary model.")
+            return {
+                "error": "Kill switch active",
+                "attempts": 1,
+                "provider_used": settings.PRIMARY_MODEL,
+            }
         if not await self.primary_cb.allow_request():
            print("⚡ Circuit breaker OPEN — skipping primary, routing to fallback")
            return {
@@ -168,15 +167,12 @@ class SentinelGraph:
     async def log_result(self, state: AgentState):
         print("Logging request result to database...")
         async with AsyncSessionLocal() as session:
-            # Find provider ID
-            from sqlalchemy import select
-            result = await session.execute(select(Provider).where(Provider.model_name == state["provider_used"]))
-            provider = result.scalar_one_or_none()
+            provider = await self.provider_service.get_or_create_provider(state["provider_used"])
             
             log = RequestLog(
                 prompt=state["prompt"],
                 response=state["response"],
-                provider_id=provider.id if provider else None,
+                provider_id=provider.id,
                 was_fallback=state["is_fallback"]
             )
             session.add(log)

@@ -105,13 +105,6 @@ export function SentinelChat() {
 
   const [isKilled, setIsKilled] = useState(false);
 
-async function killModel() {
-  await fetch(`${API_BASE}/api/v1/provider/kill`, { method: 'POST' });
-}
-
-async function restoreModel() {
-  await fetch(`${API_BASE}/api/v1/provider/restore`, { method: 'POST' });
-}
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const assistantMessageIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -537,7 +530,7 @@ async function restoreModel() {
   <button
     type="submit"
     className="button button--primary"
-    disabled={isStreaming || isKilled}
+    disabled={isStreaming}
   >
     {isStreaming ? 'Sending...' : 'Send prompt'}
   </button>
