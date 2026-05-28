@@ -3,15 +3,17 @@ from app.graph.orchestrator import SentinelGraph
 from app.streaming.manager import StreamingManager
 from app.streaming.event_bus import EventBus
 from app.schemas.streaming import StreamEventType
+from app.resilience.provider_health import ProviderHealthManager
 
 class ChatService:
 
     def __init__(
         self,
         streaming: StreamingManager,
+        graph=None
     ) -> None:
         self.streaming = streaming
-        self.graph = SentinelGraph()
+        self.graph = graph or SentinelGraph()
 
     async def process_request(
         self,
@@ -21,25 +23,33 @@ class ChatService:
     ) -> AsyncGenerator:
 
         prompt = payload.get("prompt", "")
-        
-        await self.streaming.emit(
-            trace_id,
-            StreamEventType.STATUS,
-            {"message": "Analyzing request and selecting model..."},
-        )
 
-        # We run the graph and capture the result
-        # In a full implementation, we would wrap the graph nodes to emit events
-        # For the vertical slice, we emit the key transitions.
-        
+        # Check kill switch before doing anything
+        if not await ProviderHealthManager.is_available():
+            await self.streaming.emit(
+                trace_id,
+                StreamEventType.STATUS,
+                {"message": "⛔ Primary model offline. Routing to fallback..."},
+            )
+        else:
+            await self.streaming.emit(
+                trace_id,
+                StreamEventType.STATUS,
+                {"message": "Analyzing request and selecting model..."},
+            )
+
         try:
-            result = await self.graph.workflow.ainvoke({"prompt": prompt})
-            
+            # Pass kill switch state to graph so it knows to use fallback
+            result = await self.graph.workflow.ainvoke({
+                "prompt": prompt,
+                "force_fallback": not await ProviderHealthManager.is_available(),
+            })
+
             if result.get("is_fallback"):
                 await self.streaming.emit(
                     trace_id,
                     StreamEventType.STATUS,
-                    {"message": "Primary model unstable. Fail-over triggered to backup system..."},
+                    {"message": "Primary model offline. Serving response from fallback model..."},
                 )
 
             await self.streaming.emit(
@@ -63,3 +73,4 @@ class ChatService:
 
         while True:
             yield await event_bus.consume()
+    # ... rest of your existing stream logic

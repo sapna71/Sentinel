@@ -17,6 +17,7 @@ class AgentState(TypedDict):
     is_fallback: bool
     tool_calls: List[str]
     tool_outputs: List[str]
+    force_fallback: bool
 
 class SentinelGraph:
     def __init__(self):
@@ -28,6 +29,7 @@ class SentinelGraph:
         }
         # Initialize SqliteSaver for state recovery
         # SqliteSaver.from_conn_string returns a context manager in newer versions
+        self.primary_cb = CircuitBreaker()
         self.checkpointer = SqliteSaver.from_conn_string("checkpoints.sqlite")
         self.workflow = self._build_graph()
 
@@ -73,6 +75,21 @@ class SentinelGraph:
             return builder.compile()
 
     async def call_primary(self, state: AgentState):
+        if state.get("force_fallback"):
+          print("⛔ Kill switch active. Skipping primary model.")
+        return {
+            "error": "Kill switch active",
+            "attempts": 1,
+            "provider_used": settings.PRIMARY_MODEL,
+            "force_fallback": True,
+        }
+        if not await self.primary_cb.allow_request():
+           print("⚡ Circuit breaker OPEN — skipping primary, routing to fallback")
+           return {
+            "error": "Circuit breaker open — primary model unavailable",
+            "attempts": 1,
+            "provider_used": settings.PRIMARY_MODEL,
+        }
         print(f"🚀 Attempting primary model: {settings.PRIMARY_MODEL}")
         res = await self.provider_service.call_model(settings.PRIMARY_MODEL, state["prompt"])
         
@@ -108,6 +125,7 @@ class SentinelGraph:
 
             return {
                 "response": res.content,
+                "error": None,
                 "provider_used": settings.FALLBACK_MODEL,
                 "attempts": 2,
                 "is_fallback": True,
@@ -168,6 +186,8 @@ class SentinelGraph:
     def should_fallback(self, state: AgentState):
         if state.get("error") and not state.get("response"):
             return "fallback"
+        if state.get("error") and not state.get("response"):
+           return "fallback"
         return "success"
 
     def check_for_tools_logic(self, state: AgentState):

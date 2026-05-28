@@ -5,6 +5,21 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 
+async function killModel() {
+  await fetch(`${API_BASE}/api/v1/chat/provider/kill`, { method: 'POST' });
+}
+
+async function restoreModel() {
+  await fetch(`${API_BASE}/api/v1/chat/provider/restore`, { method: 'POST' });
+}
+
+async function tripCircuitBreaker() {
+  await fetch(`${API_BASE}/api/v1/chat/provider/chaos/trip`, { method: 'POST' });
+}
+
+async function resetCircuitBreaker() {
+  await fetch(`${API_BASE}/api/v1/chat/provider/chaos/reset`, { method: 'POST' });
+}
 type ChatRole = 'user' | 'assistant' | 'system';
 type ChatMessage = {
   id: string;
@@ -88,6 +103,15 @@ export function SentinelChat() {
   const [activeProvider, setActiveProvider] = useState('Primary lane');
   const [lastLatency, setLastLatency] = useState<number | null>(null);
 
+  const [isKilled, setIsKilled] = useState(false);
+
+async function killModel() {
+  await fetch(`${API_BASE}/api/v1/provider/kill`, { method: 'POST' });
+}
+
+async function restoreModel() {
+  await fetch(`${API_BASE}/api/v1/provider/restore`, { method: 'POST' });
+}
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const assistantMessageIdRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -299,6 +323,115 @@ export function SentinelChat() {
             </div>
           </div>
 
+          {/* Chaos Control Panel — separate labeled section */}
+          <div style={{
+            padding: '14px 20px',
+            borderBottom: '1px solid rgba(148, 163, 184, 0.14)',
+            background: 'rgba(255, 255, 255, 0.02)',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+            }}>
+              <div>
+                <p style={{ margin: 0, fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(148,163,184,0.6)' }}>
+                  Chaos Simulation Controls
+                </p>
+                <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: 'rgba(148,163,184,0.5)' }}>
+                  Simulate infrastructure failures for resilience demo
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+
+                {/* Kill Switch */}
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  style={{
+                    borderColor: isKilled ? 'rgba(90,242,168,0.5)' : 'rgba(255,107,139,0.5)',
+                    color: isKilled ? 'var(--accent-success)' : 'var(--accent-danger)',
+                    padding: '8px 16px',
+                    fontSize: '0.84rem',
+                    background: isKilled ? 'rgba(90,242,168,0.06)' : 'rgba(255,107,139,0.06)',
+                  }}
+                  onClick={async () => {
+                    if (!isKilled) {
+                      setLiveStatus('⛔ Kill switch activated — Gemma4 offline');
+                      await killModel();
+                    } else {
+                      setLiveStatus('✅ Gemma4 restored — ready');
+                      await restoreModel();
+                    }
+                    setIsKilled((prev) => !prev);
+                  }}
+                >
+                  {isKilled ? '✅ Restore Model' : '⛔ Kill Model'}
+                </button>
+
+                {/* Divider */}
+                <div style={{ width: '1px', height: '28px', background: 'rgba(148,163,184,0.15)' }} />
+
+                {/* Trip Circuit */}
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  style={{
+                    borderColor: 'rgba(245,158,11,0.5)',
+                    color: 'var(--accent-warm)',
+                    padding: '8px 16px',
+                    fontSize: '0.84rem',
+                    background: 'rgba(245,158,11,0.05)',
+                  }}
+                  onClick={async () => {
+                    await tripCircuitBreaker();
+                    setLiveStatus('⚡ Circuit breaker tripped — routing to fallback');
+                  }}
+                >
+                  ⚡ Trip Circuit
+                </button>
+
+                {/* Reset Circuit */}
+                <button
+                  type="button"
+                  className="button button--ghost"
+                  style={{
+                    borderColor: 'rgba(138,198,255,0.5)',
+                    color: 'var(--accent-2)',
+                    padding: '8px 16px',
+                    fontSize: '0.84rem',
+                    background: 'rgba(138,198,255,0.05)',
+                  }}
+                  onClick={async () => {
+                    await resetCircuitBreaker();
+                    setLiveStatus('✅ Circuit breaker reset — primary restored');
+                  }}
+                >
+                  ↺ Reset Circuit
+                </button>
+
+              </div>
+            </div>
+
+            {/* Active state banners */}
+            {isKilled && (
+              <div style={{
+                marginTop: '10px',
+                padding: '8px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255,107,139,0.08)',
+                border: '1px solid rgba(255,107,139,0.2)',
+                color: '#ffc5d2',
+                fontSize: '0.84rem',
+              }}>
+                ⛔ Kill switch active — Gemma4 is offline. All prompts will route to fallback model.
+              </div>
+            )}
+          </div>
+
           <div className="message-list">
             {messages.map((message) => (
               <article
@@ -367,7 +500,7 @@ export function SentinelChat() {
                   Send an instruction and review the live response as Sentinel processes it.
                 </p>
 
-                <div className="button-row">
+                 {/* <div className="button-row">
                   <button
                     type="button"
                     className="button button--ghost"
@@ -384,7 +517,31 @@ export function SentinelChat() {
                   <button type="submit" className="button button--primary" disabled={isStreaming}>
                     {isStreaming ? 'Sending...' : 'Send prompt'}
                   </button>
-                </div>
+                </div> */}
+
+                <div className="button-row">
+
+  <button
+    type="button"
+    className="button button--ghost"
+    onClick={() => {
+      abortRef.current?.abort();
+      setIsStreaming(false);
+      setLiveStatus('Stream cancelled');
+    }}
+    disabled={!isStreaming}
+  >
+    Stop stream
+  </button>
+
+  <button
+    type="submit"
+    className="button button--primary"
+    disabled={isStreaming || isKilled}
+  >
+    {isStreaming ? 'Sending...' : 'Send prompt'}
+  </button>
+</div>
               </div>
             </form>
           </div>

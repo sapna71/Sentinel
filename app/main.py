@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database.db import init_db
-
+from app.api.routers import chat
 # Future router imports
 from app.api.routers.chat import router as chat_router
 # from app.api.routers.health import router as health_router

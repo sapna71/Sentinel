@@ -208,11 +208,40 @@ uv pip install fastapi uvicorn sqlalchemy aiosqlite pydantic pydantic-settings
 uv pip install langgraph langchain structlog httpx sse-starlette
 ```
 
-##Run Backend
+## Run Backend
 ```text
 uvicorn app.main:app --reload
 ```
-##Important Development Notes
+
+## Resilience Demo
+Use this section to show the chaos handling path for the agent and the user-facing experience.
+
+### Demo steps
+1. Start the backend:
+```text
+uvicorn app.main:app --reload
+```
+2. Submit a prompt through the frontend or API, for example:
+```json
+{"prompt": "Summarize the current infrastructure status."}
+```
+3. Simulate a primary provider outage by making the primary LLM server unavailable.
+4. Watch for these user-visible signals:
+   - status update: `Primary model unstable. Fail-over triggered to backup system...`
+   - completion event with fallback provider metadata
+   - if the stream fails entirely, a system error message appears in the chat timeline
+
+### Expected user experience
+- the UI should show live status updates during failover
+- the active provider label should switch to the fallback lane
+- the final response should still be delivered from the backup model
+
+### Validate with tests
+```text
+pytest -q tests/test_resilience.py
+```
+
+## Important Development Notes
 DO NOT COMMIT
 
 Never commit:
