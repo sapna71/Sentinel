@@ -41,7 +41,7 @@ type StreamEnvelope = {
   };
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://sentinel-backend-n8ir.onrender.com';
 const STREAM_ENDPOINT = `${API_BASE}/api/v1/chat/stream`;
 
 function uid() {
